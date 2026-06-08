@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pac-Man em HTML5</title>
+    <style>
+        body {
+            background-color: #111;
+            color: white;
+            font-family: 'Courier New', Courier, monospace;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+        #score-board {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+        canvas {
+            border: 4px solid blue;
+            background-color: black;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="score-board">Pontuação: <span id="score">0</span></div>
+    <canvas id="pacmanCanvas" width="380" height="420"></canvas>
+    <script>
+        const canvas = document.getElementById('pacmanCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreEl = document.getElementById('score');
+
+        const tileSize = 20;
+        let score = 0;
+
+        // 1 = Parede, 0 = Caminho/Bolinha, 2 = Fantasma, 3 = Vazio
+        const map = [
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+            [1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1],
+            [1,0,1,1,0,1,1,1,0,1,0,1,1,1,0,1,1,0,1],
+            [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+            [1,0,1,1,0,1,0,1,1,1,1,1,0,1,0,1,1,0,1],
+            [1,0,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,0,1],
+            [1,1,1,1,1,0,1,1,1,2,1,2,1,1,1,0,1,1,1,1],
+            [1,1,1,1,1,0,1,2,2,2,2,2,2,2,1,0,1,1,1,1],
+            [1,1,1,1,1,0,1,2,1,1,2,1,1,2,1,0,1,1,1,1],
+            [2,2,2,2,2,0,2,2,1,2,2,2,1,2,2,0,2,2,2,2],
+            [1,1,1,1,1,0,1,2,1,1,1,1,1,2,1,0,1,1,1,1],
+            [1,1,1,1,1,0,1,2,2,2,2,2,2,2,1,0,1,1,1,1],
+            [1,1,1,1,1,0,1,2,1,1,1,1,1,2,1,0,1,1,1,1],
+            [1,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1],
+            [1,0,1,1,0,1,1,1,0,1,0,1,1,1,0,1,1,0,1],
+            [1,0,0,1,0,0,0,0,0,2,0,0,0,0,0,1,0,0,1],
+            [1,1,0,1,0,1,0,1,1,1,1,1,0,1,0,1,0,1,1],
+            [1,0,0,0,0,1,0,0,0,1,0,0,0,1,0,0,0,0,1],
+            [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+        ];
+
+        const pacman = {
+            x: 9,
+            y: 15,
+            dirX: 0,
+            dirY: 0,
+            radius: 10
+        };
+
+        const ghosts = [
+            {x: 8, y: 8, color: 'red', dirX: 0, dirY: -1},
+            {x: 9, y: 8, color: 'pink', dirX: 1, dirY: 0},
+            {x: 10, y: 8, color: 'cyan', dirX: -1, dirY: 0}
+        ];
+
+        // Desenhar mapa
+        function drawMap() {
+            for (let row = 0; row < map.length; row++) {
+                for (let col = 0; col < map[row].length; col++){
+                    if (map[row][col] === 1){
+                        ctx.fillStyle = 'blue';
+                        ctx.fillRect(col * tileSize, row * tileSize, tileSize, tileSize);
+                    } else if (map[row][col] === 0) {
+                        ctx.beginPath();
+                        ctx.arc(col * tileSize + tileSize / 2, row * tileSize + tileSize / 2, 3, 0, Math.PI * 2);
+                        ctx.fillStyle = '#ffb8ae';
+                        ctx.fill();
+                        ctx.closePath();
+                    }
+                }
+            }
+        }
+
+        // Desenhar Pac-Man
+        function drawPacMan(){
+            ctx.beginPath();
+            const centerX = pacman.x * tileSize + tileSize / 2;
+            const centerY = pacman.y * tileSize + tileSize / 2;
+            ctx.arc(centerX, centerY, pacman.radius, 0.2 * Math.PI, 1.8 * Math.PI);
+            ctx.lineTo(centerX, centerY);
+            ctx.fillStyle = 'yellow';
+            ctx.fill();
+            ctx.closePath();
+        }
+
+        // Desenhar Fantasmas
+        function drawGhosts(){
+            ghosts.forEach(ghost => {
+                ctx.beginPath();
+                ctx.arc(ghost.x * tileSize + tileSize / 2, ghost.y * tileSize + tileSize / 2, 10, 0, Math.PI * 2);
+                ctx.fillStyle = ghost.color;
+                ctx.fill();
+                ctx.closePath();
+            });
+        }
+
+        // Mudar direção com as setas do teclado
+        window.addEventListener('keydown', (e) =>{
+            switch (e.key){
+                case 'ArrowUp':
+                    pacman.dirX = 0; pacman.dirY = -1; break;
+                case 'ArrowDown':
+                    pacman.dirX = 0; pacman.dirY = 1; break;
+                case 'ArrowLeft':
+                    pacman.dirX = -1; pacman.dirY = 0; break;
+                case 'ArrowRight':
+                    pacman.dirX = 1; pacman.dirY = 0; break;
+            }
+        });
+
+        // Lógica de Movimento
+        function moveEntities() {
+            // Mover Pac-Man
+            const nextX = pacman.x + pacman.dirX;
+            const nextY = pacman.y + pacman.dirY;
+
+            // Verifica se a próxima casa não é parede (1)
+            if (map[nextY] && map[nextY][nextX] !== 1) {
+                pacman.x = nextX;
+                pacman.y = nextY;
+
+                // Comer bolinhas
+                if (map[pacman.y][pacman.x] === 0) {
+                    map[pacman.y][pacman.x] = 3; // 3 representa espaço vazio
+                    score += 10;
+                    scoreEl.innerText = score;
+                }
+            }
+
+            // Movimento simples dos Fantasmas
+            ghosts.forEach(ghost => {
+                const nextGhostX = ghost.x + ghost.dirX;
+                const nextGhostY = ghost.y + ghost.dirY;
+
+                // Se bater em parede, inverte a direção
+                if (!map[nextGhostY] || map[nextGhostY][nextGhostX] === 1) {
+                    ghost.dirX *= -1;
+                    ghost.dirY *= -1;
+                } else {
+                    ghost.x = nextGhostX;
+                    ghost.y = nextGhostY;
+                }
+
+                // Colisão com Pac-Man (Game Over)
+                if (ghost.x === pacman.x && ghost.y === pacman.y){
+                    alert('Game Over! Sua pontuação: ' + score);
+                    document.location.reload();
+                }
+            });
+        }
+
+        // Loop Principal
+        function gameLoop() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawMap();
+            drawPacMan();
+            drawGhosts();
+            moveEntities();
+        }
+
+        // Atualiza o jogo a cada 250 milissegundos
+        setInterval(gameLoop, 250);
+    </script>
+</body>
+</html>
